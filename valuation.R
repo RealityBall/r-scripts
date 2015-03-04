@@ -6,7 +6,7 @@ conn = dbConnect(MySQL(), user='root', password='', dbname='mlbretrosheet', host
 
 rs = dbSendQuery(conn, "
 select 
-  a.gameId, a.id, sum(fanDuel) as actual, fanduelBase, pitcherAdj, parkAdj, baTrendAdj, oddsAdj, matchupAdj, revert
+  a.gameId, a.id, sum(fanDuel) as actual, fanduelBase, pitcherAdj, parkAdj, baTrendAdj, oddsAdj, matchupAdj, productionRate
 from 
   fantasyPrediction a, hitterFantasyStats b
 where
@@ -33,9 +33,9 @@ updatePrediction <- function(predictions, series) {
 } 
 
 # Train multiple regressions
-fit <- lm(actual ~ fanduelBase + pitcherAdj + parkAdj + baTrendAdj + oddsAdj + matchupAdj, data=series);
+fit <- lm(actual ~ fanduelBase + pitcherAdj + parkAdj + baTrendAdj + oddsAdj + matchupAdj + productionRate, data=series);
 summary(fit);
-fit <- lm(actual ~ fanduelBase + oddsAdj + pitcherAdj + matchupAdj, data=series);
+fit <- lm(actual ~ fanduelBase + oddsAdj + pitcherAdj + matchupAdj + productionRate, data=series);
 summary(fit);
 
 # Train random forest
@@ -46,8 +46,6 @@ rf <- randomForest(actual ~ fanduelBase + oddsAdj + matchupAdj, data=seriesTrain
 
 # Test random forest
 predictions <- predict(rf, seriesTest);
-predictions[seriesTest$revert > 0]=predictions[predictions[seriesTest$revert > 0]] / 2.0;
-predictions[seriesTest$revert <= -3]=predictions[predictions[seriesTest$revert <= -3]] * 2.0;
 seriesTest[predictions[seriesTest$actual > 15,],]
 #updatePrediction(predictions, seriesTest);
 

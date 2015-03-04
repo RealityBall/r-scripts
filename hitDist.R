@@ -13,7 +13,7 @@ sum(LHfanDuel) as LHfanDuel, sum(LHdraftKings) as LHdraftKings, sum(LHdraftster)
 from 
 players a, hitterFantasyStats b
 where
-a.id = '", bat.id, "' and date < '", date, "' and a.id = b.id
+a.id = '", bat.id, "' and date < '", date, "' and a.id = b.id and year = '2014'
 group by 
 a.id, date
 order by 
