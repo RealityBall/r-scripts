@@ -2,14 +2,9 @@ conn = dbConnect(MySQL(), user='root', password='', dbname='mlbretrosheet', host
 
 rs = dbSendQuery(conn, "
 select 
-  a.gameId, a.id, sum(fanDuel) as actual, fanduelBase, pitcherAdj, parkAdj, baTrendAdj, oddsAdj, matchupAdj, b.productionRate
+  gameId, id, fanduelActual as actual, fanduelBase, pitcherAdj, parkAdj, baTrendAdj, oddsAdj, matchupAdj, productionRate, overUnder, overUnderML
 from 
-  fantasyPrediction a, hitterFantasyStats b
-where
-  a.gameId = b.gameId and 
-  a.id = b.id 
-group by 
-  a.gameId, a.id
+  fantasyPrediction a
 order by 
     substr(a.gameId, 4, 8);");
 
@@ -20,8 +15,8 @@ dbDisconnect(conn)
 # Compute production probabilities
 series$production = rep(1.0, nrow(series));
 #series$production[series$actual < series$fanduelBase * 1.25] = 0.0;
-series$production[series$actual <= 3.0] = 0.0;
-series <- series[series$productionRate > 0.0 & series$productionRate < 1.0,];
+series$production[series$actual <= 1.0] = 0.0;
+#series <- series[series$productionRate > 0.0 & series$productionRate < 1.0,];
 #plot(density(series[series$pitcherAdj > 0.0,]$productionRate, na.rm=TRUE));
 #lines(density(series[series$pitcherAdj < 0.0,]$productionRate, na.rm=TRUE), col=2);
 series$oddsBucket = rep(0.0, nrow(series));
@@ -33,11 +28,9 @@ plot(series[c(3,4,5,6,7,8,9,10)]);
 # Train logistic model
 seriesTrain <- series[1:(nrow(series) * 0.7),]
 seriesTest <- series[(nrow(series) * 0.7):nrow(series),]
-producing <- glm(as.factor(production) ~ productionRate + oddsAdj + matchupAdj + pitcherAdj + parkAdj, data = seriesTrain, family = binomial);
-#producing <- glm(as.factor(production) ~  oddsAdj + matchupAdj + productionRate, data = seriesTrain, family = binomial);
-#producing <- glm(as.factor(production) ~  actual, data = seriesTrain, family = binomial);
-#producing <- glm(as.factor(production) ~ pitcherAdj + parkAdj + oddsAdj + matchupAdj, data = seriesTrain, family = binomial);
-#producing <- glm(as.factor(production) ~ oddsAdj + productionRate, data = seriesTrain, family = binomial);
+#seriesTrain <- series[1:(nrow(playerSeries) * 0.7),]
+#seriesTest <- series[(nrow(playerSeries) * 0.7):nrow(playerSeries),]
+producing <- glm(as.factor(production) ~ productionRate + oddsAdj + matchupAdj + pitcherAdj + parkAdj + overUnder, data = seriesTrain, family = binomial);
 summary(producing);
 producePredict <- predict(producing, newdata=seriesTrain, type="response");
 seriesTrain$producePredict = producePredict;
@@ -57,7 +50,7 @@ ggplot(data=series, aes(x=jitter(productionRate, 0.2),y=jitter(production, 0.2),
 #  library(miscTools); library(ggplot2); library(randomForest)
 #
 # Train random forest
-rf <- randomForest(as.factor(production) ~ fanduelBase + oddsAdj + matchupAdj + productionRate + pitcherAdj, data=seriesTrain, ntree=40, na.action=na.omit);
+rf <- randomForest(as.factor(production) ~ fanduelBase + productionRate + oddsAdj + matchupAdj + pitcherAdj + parkAdj + overUnder, data=seriesTrain, ntree=40, na.action=na.omit);
 
 # Test random forest
 predictions <- predict(rf, newdata=seriesTest, type="response");

@@ -31,40 +31,91 @@ zeroPoints <- function(xSeries, ySeries, name, lower, upper) {
 oddsData <- zeroPoints(series$oddsAdj, series$production, "Odds Adj", -1.0, 1.0);
 pitcherData <- zeroPoints(series$pitcherAdj, series$production, "Pitcher Adj", -1.0, 1.0);
 matchupData <- zeroPoints(series$matchupAdj, series$production, "Matchup Adj", -1.0, 1.0);
-rateData <- zeroPoints(series$productionRate, series$production, "Rate Adj", 0.0, 1.0);
-parkData <- zeroPoints(series$parkAdj, series$production, "Park Adj", -1.0, 1.0);
+rateData <- zeroPoints(series$productionRate, series$production, "Rate Adj", 0.5, 1.0);
+parkData <- zeroPoints(series$parkAdj, series$production, "Park Adj", 0.0, 1.0);
+ouData <- zeroPoints(series$overUnder, series$production, "OverUnder", 6, 10);
 
-bayesPredict <- function(odds, pitcher, matchup, rate, park) {
+autoVsManu <- FALSE
+
+bayesPredict <- function(odds, pitcher, matchup, rate, park, overUnder) {
   start <- 1.0;
   
-  if (odds > 0.0) start <- start * oddsData[1]
-  else start <- start * oddsData[2]
+  if (autoVsManu) {
+    if (odds > 0.0) start <- start * oddsData[1]
+    else start <- start * oddsData[2]    
+  } else {
+    if (odds > 0.1) start <- start * 0.6
+    else if (odds < -0.1) start <- start * 0.5
+    else if (odds > 0.0) start <- start * oddsData[1]
+    else start <- start * oddsData[2]    
+  }
   
-  if (pitcher > 0.0) start <- start * pitcherData[1]
-  else start <- start * pitcherData[2]
+  if (autoVsManu) {
+    if (matchup > 0.0) start <- start * matchupData[1]
+    else start <- start * matchupData[2]    
+  } else {
+    if (matchup > 0.1) start <- start * 0.575
+    else if (matchup < -0.1) start <- start * 0.475
+    else if (matchup > 0.0) start <- start * matchupData[1]
+    else start <- start * matchupData[2]    
+  }
+
+  if (autoVsManu) {
+    if (rate > 0.75) start <- start * 0.61
+    else start <- start * 0.45
+  } else {
+    if (rate >= 0.85) start <- start * 0.675
+    else if (rate <= 0.65) start <- start * 0.43
+    else if (rate >= 0.75) start <- start * rateData[1]
+    else start <- start * rateData[2]    
+  }
+    
+  if (!is.na(pitcher)) {
+    if (autoVsManu) {
+      if (pitcher > 0.0) start <- start * pitcherData[1]
+      else start <- start * pitcherData[2]
+    } else {
+      if (pitcher > 0.0) start <- start * pitcherData[1]
+      else if (pitcher < -0.5) start <- start * 0.43
+      else start <- start * pitcherData[2]
+    }     
+  } else start <- 0.0
   
-  if (matchup > 0.0) start <- start * matchupData[1]
-  else start <- start * matchupData[2]
+  if (autoVsManu) {
+    if (park > 0.5) start <- start * parkData[1]
+    else start <- start * parkData[2]    
+  } else {
+    if (park > 0.62) start <- start * 0.575
+    else if (park > 0.5) start <- start * parkData[1]
+    else start <- start * parkData[2]        
+  }
   
-  if (rate > 0.5) start <- start * rateData[1]
-  else start <- start * rateData[2]
-  
-  if (park > 0.0) start <- start * park[1]
-  else start <- start * park[2]
+  if (autoVsManu) {
+    if (overUnder > 7.5) start <- start * ouData[1]
+    else start <- start * ouData[2]    
+  } else {
+    if (overUnder >= 9.0) start <- start * 0.61
+    else if (overUnder >= 7.5) start <- start * 0.56
+    else start <- start * 0.532
+  }
   
   start
 }
 
-series$bayesPredicted <- as.array(apply(series[,c('oddsAdj', 'pitcherAdj', 'matchupAdj', 'productionRate', 'parkAdj')], 1, 
-                                        function(x) bayesPredict(x[1], x[2], x[3], x[4], x[5])));
-plot(jitter(series$bayesPredicted, 0.1), series$actual);
+series$bayesPredicted <- as.array(apply(series[,c('oddsAdj', 'pitcherAdj', 'matchupAdj', 'productionRate', 'parkAdj', 'overUnder')], 1, 
+                                        function(x) bayesPredict(x[1], x[2], x[3], x[4], x[5], x[6])));
+plot(jitter(series$bayesPredicted, 0.1), series$production);
 summary(series[series$bayesPredicted > summary(series$bayesPredicted)[3],]$actual);
 sd(series[series$bayesPredicted > summary(series$bayesPredicted)[3],]$actual);
 summary(series[series$bayesPredicted < summary(series$bayesPredicted)[3],]$actual);
 sd(series[series$bayesPredicted < summary(series$bayesPredicted)[3],]$actual);
 
-plot(density(series[series$bayesPredicted < summary(series$bayesPredicted)[3],]$actual, na.rm=TRUE));
-lines(density(series[series$bayesPredicted > summary(series$bayesPredicted)[3],]$actual, na.rm=TRUE), col=2);
+plot(density(series[series$bayesPredicted < summary(series$bayesPredicted)[4],]$actual, na.rm=TRUE));
+lines(density(series[series$bayesPredicted > summary(series$bayesPredicted)[4],]$actual, na.rm=TRUE), col=2);
 
+plot(density(series[series$bayesPredicted < summary(series$bayesPredicted)[4],]$production, na.rm=TRUE));
+lines(density(series[series$bayesPredicted > summary(series$bayesPredicted)[4],]$production, na.rm=TRUE), col=2);
 
-
+totalActual <- c(0.0, 0.0)
+totalActual[1] <- sum(series[series$bayesPredicted > summary(series$bayesPredicted)[4],]$actual)
+totalActual[2] <- sum(series[series$bayesPredicted < summary(series$bayesPredicted)[4],]$actual)
