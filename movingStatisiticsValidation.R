@@ -13,9 +13,16 @@ volSeries <- volSeries[!is.na(series$dailyBattingAverage),];
 cleanSeries$filtered <- filter(timeSeries, rep(1.0 / 25.0, 25), sides = 1);
 cleanSeries$sd <- ts(runSD(cleanSeries$dailyBattingAverage, n=100));
 
+movSeries$filteredBattingAverageMov = filter(movSeries$battingAverageMov, rep(1.0 / 25.0, 25), sides = 1);
+baMovSD = runsd (movSeries$battingAverageMov, 100, align="right")
+plot(ts(movSeries$battingAverageMov));
+lines(movSeries$filteredBattingAverageMov, col = colors[3]);
+lines(baMovSD, col = colors[1]);
+
 colors <- rainbow(3)
 
 plot(cleanSeries$filtered);
+plot(ts(movSeries$battingAverageMov));
 lines(ts(movSeries$battingAverageMov), col = colors[1]);
 
 plot(cleanSeries$sd);
