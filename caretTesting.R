@@ -23,12 +23,12 @@ op <- options(digits.secs = 2)
 Sys.time()
 bootControl <- trainControl(number = 50)
 set.seed(2)
-svmFit <- train(trainDescr, trainClass,
-                method = "svmRadial", tuneLength = 5,
-                trControl = bootControl, scaled = FALSE)
-#rfFit <- train(trainDescr, trainClass,
-#                method = "cforest", tuneLength = 5,
+#svmFit <- train(trainDescr, trainClass,
+#                method = "svmRadial", tuneLength = 5,
 #                trControl = bootControl, scaled = FALSE)
+rfFit <- train(trainDescr, trainClass,
+               method = "rf", tuneLength = 5,
+               trControl = bootControl)
 op <- options(digits.secs = 2)
 Sys.time()
 
