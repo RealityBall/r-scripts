@@ -3,8 +3,10 @@ library("caret")
 set.seed(1)
 
 inTrain <- createDataPartition(series$production, p = 3/4, list = FALSE)
-trainDescr <- series[inTrain,5:ncol(series) - 1]
-testDescr <- series[-inTrain,5:ncol(series) - 1]
+trainDescr <- series[inTrain,5:(ncol(series) - 2)]
+#trainDescr$fanDuelTrend <- series[inTrain,ncol(series)]
+testDescr <- series[-inTrain,5:(ncol(series) - 2)]
+#testDescr$fanDuelTrend <- series[-inTrain,ncol(series)]
 trainClass <- series$production[inTrain]
 testClass <- series$production[-inTrain]
 testActual <- series$actual[-inTrain]
@@ -21,14 +23,14 @@ testDescr <- predict(xTrans, testDescr)
 
 op <- options(digits.secs = 2)
 Sys.time()
-bootControl <- trainControl(number = 50)
+bootControl <- trainControl(number = 10)
 set.seed(2)
-#svmFit <- train(trainDescr, trainClass,
-#                method = "svmRadial", tuneLength = 5,
-#                trControl = bootControl, scaled = FALSE)
-rfFit <- train(trainDescr, trainClass,
-               method = "rf", tuneLength = 5,
-               trControl = bootControl)
+svmFit <- train(trainDescr, trainClass,
+                method = "svmRadial", tuneLength = 5,
+                trControl = bootControl, scaled = FALSE)
+#rfFit <- train(trainDescr, trainClass,
+#               method = "rf", tuneLength = 5,
+#               trControl = bootControl)
 op <- options(digits.secs = 2)
 Sys.time()
 
