@@ -23,7 +23,8 @@ fsTrend <- function(index, data, stream) {
   #movAr <- ar(m1.filteredModel$f, FALSE, 10)
   movAr <- ar(m1.filteredModel$f, method = "burg")
   fsTrendPredict <- predict(movAr, n.ahead=lookahead)$pred[1:lookahead]
-  fsTrendPredict[lookahead] - fsTrendPredict[1]
+  trendLm <- lm(fsTrendPredict ~ seq(1, lookahead))
+  trendLm$coefficients[2]
 }
 
 lookback <- 25
@@ -73,6 +74,7 @@ m1.filteredModel <- dlmFilter(recentModel, m1.dlm)
 movAr <- ar(m1.filteredModel$f)
 #movAr <- ar(m1.filteredModel$f, FALSE, 10)
 #movAr <- ar(recentModel, FALSE, 10)
+movLm <- lm(predict(movAr, n.ahead=lookahead)$pred[1:lookahead] ~ seq(1, lookahead))
 
 plot(recent,  
      main = "Trailing 25 game fantasy score", 

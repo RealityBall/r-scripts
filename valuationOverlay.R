@@ -2,7 +2,8 @@ conn = dbConnect(MySQL(), user='root', password='', dbname='mlbretrosheet', host
 
 rs = dbSendQuery(conn, "
 select 
-  gameId, date, id, fanduelActual as actual, fanduelBase, pitcherAdj, parkAdj, baTrendAdj, oddsAdj, matchupAdj, productionRate, overUnder, overUnderML
+  gameId, date, id, startingPitcher, fanduelActual as actual, fanduelBase, 
+  pitcherAdj, parkAdj, oddsAdj, matchupAdj, productionRate, overUnder, overUnderML
 from 
   fantasyPrediction a
 order by 
@@ -20,6 +21,10 @@ series <- merge(series, fsTimeseries, by=c("date", "id"))
 series$RHfanDuelTrend <- as.numeric(series$RHfanDuelTrend)
 series$LHfanDuelTrend <- as.numeric(series$LHfanDuelTrend)
 series$fanDuelTrend <- as.numeric(series$fanDuelTrend)
+for(i in 1:nrow(series)) {
+  if (series$startingPitcher[i] == 'R') series$fanDuelTrend[i] <- as.numeric(series$RHfanDuelTrend[i])
+  else series$fanDuelTrend[i] <- as.numeric(series$LHfanDuelTrend[i])
+}
 series <- series[, !(colnames(series) %in% c("RHfanDuel", "LHfanDuel", "fanDuel", "RHfanDuelTrend", "LHfanDuelTrend"))]
 
 #series <- series[series$productionRate > 0.0 & series$productionRate < 1.0,];
