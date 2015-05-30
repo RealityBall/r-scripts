@@ -4,7 +4,8 @@ set.seed(1)
 
 inTrain <- createDataPartition(series$production, p = 3/4, list = FALSE)
 fullTrainDescr <- series[,6:ncol(series)]
-fullTrainDescr <- fullTrainDescr[, !(colnames(fullTrainDescr) %in% c("production", "fanDuelTrend"))]
+#fullTrainDescr <- fullTrainDescr[, !(colnames(fullTrainDescr) %in% c("production", "fanDuelTrend"))]
+fullTrainDescr <- fullTrainDescr[, !(colnames(fullTrainDescr) %in% c("production"))]
 fullTrainClass <- series$production
 
 trainDescr <- fullTrainDescr[inTrain,]
