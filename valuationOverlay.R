@@ -1,81 +1,79 @@
-conn = dbConnect(MySQL(), user='root', password='', dbname='mlbretrosheet', host='localhost');
-
-rs = dbSendQuery(conn, "
-select 
-  gameId, date, id, startingPitcher, fanduelActual as actual, fanduelBase, 
-  pitcherAdj, parkAdj, oddsAdj, matchupAdj, productionRate, overUnder, overUnderML
-from 
-  fantasyPrediction a
-order by 
-  substr(a.gameId, 4, 8);");
-
-series = fetch(rs, n=-1);
-dbClearResult(rs)
-dbDisconnect(conn)
-
-# Compute production probabilities
-series$production = rep(1.0, nrow(series));
-#series$production[series$actual < series$fanduelBase * 1.25] = 0.0;
-series$production[series$actual <= 1.0] = 0.0;
-series <- merge(series, fsTimeseries, by=c("date", "id"))
-series$RHfanDuelTrend <- as.numeric(series$RHfanDuelTrend)
-series$LHfanDuelTrend <- as.numeric(series$LHfanDuelTrend)
-series$fanDuelTrend <- as.numeric(series$fanDuelTrend)
-for(i in 1:nrow(series)) {
-  if (series$startingPitcher[i] == 'R') series$fanDuelTrend[i] <- as.numeric(series$RHfanDuelTrend[i])
-  else series$fanDuelTrend[i] <- as.numeric(series$LHfanDuelTrend[i])
-}
-series <- series[, !(colnames(series) %in% c("RHfanDuel", "LHfanDuel", "fanDuel", "RHfanDuelTrend", "LHfanDuelTrend"))]
-
-#series <- series[series$productionRate > 0.0 & series$productionRate < 1.0,];
-#plot(density(series[series$pitcherAdj > 0.0,]$productionRate, na.rm=TRUE));
-#lines(density(series[series$pitcherAdj < 0.0,]$productionRate, na.rm=TRUE), col=2);
-series$oddsBucket = rep(0.0, nrow(series));
-series$oddsBucket[series$oddsAdj < -0.3] = -1.0;
-series$oddsBucket[series$oddsAdj > 0.3] = 1.0;
-#plot(series$productionRate, series$actual);
-plot(series[c(3,4,5,6,7,8,9,10)]);
-
-# Train logistic model
+####
+#  Logistic Model
+###
+## Train logistic model
+#
 seriesTrain <- series[1:(nrow(series) * 0.7),]
 seriesTest <- series[(nrow(series) * 0.7):nrow(series),]
-#seriesTrain <- series[1:(nrow(playerSeries) * 0.7),]
-#seriesTest <- series[(nrow(playerSeries) * 0.7):nrow(playerSeries),]
-producing <- glm(as.factor(production) ~ fanDuelTrend + productionRate + oddsAdj + matchupAdj + pitcherAdj + parkAdj + overUnder, data = seriesTrain, family = binomial);
-summary(producing);
-producePredict <- predict(producing, newdata=seriesTrain, type="response");
-seriesTrain$producePredict = producePredict;
-plot(jitter(producePredict, 0.2), jitter(seriesTrain$production, 0.2));
-ggplot(data=series, aes(x=jitter(oddsAdj, 0.1),y=jitter(actual, 0.1),color=productionRate)) +
-  geom_point(size=3) 
-ggplot(data=seriesTest, aes(x=jitter(pitcherAdj, 0.1),y=jitter(actual, 0.1),color=productionRate)) +
-  geom_point(size=3) 
-ggplot(data=seriesTest, aes(x=jitter(matchupAdj, 0.1),y=jitter(actual, 0.1),color=productionRate)) +
-  geom_point(size=3) 
-ggplot(data=series, aes(x=jitter(productionRate, 0.2),y=jitter(production, 0.2),color=actual)) +
-  geom_point(size=1) 
-#ggplot(data=seriesTest, aes(x=jitter(producePredict, 0.1),y=jitter(production, 0.1),color=oddsBucket)) +
-#  geom_point(size=3) 
 
-# Required Libraries:
-#  library(miscTools); library(ggplot2); library(randomForest)
+producing <- glm(as.factor(production) ~ fanDuelTrend + productionRate + oddsAdj + matchupAdj + pitcherAdj + overUnder + overUnderML, data = seriesTrain, family = binomial);
+summary(producing);
+
+seriesTest$predicted <- predict(producing, newdata=seriesTest, type="response")
+par(mfrow = c(1, 1))
+plot(jitter(seriesTest$predicted, 0.2), jitter(seriesTest$production, 0.2));
+
+summary(seriesTest$producePredict)
+
+# Results by halves
+plot(density(seriesTest[seriesTest$predicted < summary(seriesTest$predicted)[4],]$actual, na.rm=TRUE));
+lines(density(seriesTest[seriesTest$predicted > summary(seriesTest$predicted)[4],]$actual, na.rm=TRUE), col=2);
+# Results by q1, q23, q4
+plot(density(seriesTest[seriesTest$predicted < summary(seriesTest$predicted)[2],]$actual, na.rm=TRUE), col=2, lwd=2.5,
+     main="GLM Logistic (2014)", xlim=c(-3,15));
+lines(density(seriesTest[seriesTest$predicted > summary(seriesTest$predicted)[2] & 
+                           seriesTest$predicted < summary(seriesTest$predicted)[5],]$actual, na.rm=TRUE), col=3, lwd=2.5);
+lines(density(seriesTest[seriesTest$predicted > summary(seriesTest$predicted)[5],]$actual, na.rm=TRUE), col=4, lwd=2.5);
+legend(10, 0.20, c("Quartile 1", "Quartile 2 & 3", "Quartile 4"),
+       lty=c(1,1,1), lwd=c(2.5,2.5,2.5),col=c("red", "green", "blue")) 
+
+unique(seriesTest$mlbPos)
+fullGroup1B <- seriesTest[seriesTest$mlbPos == '1B',]
+fullGroup1B <- fullGroup1B[with(fullGroup1B, order(-predicted)),]
+fullGroup2B <- seriesTest[seriesTest$mlbPos == '2B',]
+fullGroup2B <- fullGroup2B[with(fullGroup2B, order(-predicted)),]
+fullGroupSS <- seriesTest[seriesTest$mlbPos == 'SS',]
+fullGroupSS <- fullGroupSS[with(fullGroupSS, order(-predicted)),]
+fullGroup3B <- seriesTest[seriesTest$mlbPos == '3B',]
+fullGroup3B <- fullGroup3B[with(fullGroup3B, order(-predicted)),]
+fullGroupC <- seriesTest[seriesTest$mlbPos == 'C',]
+fullGroupC <- fullGroupC[with(fullGroupC, order(-predicted)),]
+fullGroupDH <- seriesTest[seriesTest$mlbPos == 'DH',]
+fullGroupDH <- fullGroupDH[with(fullGroupDH, order(-predicted)),]
+fullGroupOF <- seriesTest[seriesTest$mlbPos == 'OF' | seriesTest$mlbPos == 'LF' | seriesTest$mlbPos == 'CF' | seriesTest$mlbPos == 'RF',]
+fullGroupOF <- fullGroupOF[with(fullGroupOF, order(-predicted)),]
+par(mfrow = c(3, 2))
+plot(jitter(fullGroup1B$predicted, 1.5), jitter(fullGroup1B$actual, 1.5), main=paste("1st Base (nobs = ", nrow(fullGroup1B), ")"), xlab="Predicted prob. of production", ylab="Actual Fanduel", xlim=c(0.15, 0.85), ylim=c(-5.0, 20.0))
+abline(lm(fullGroup1B$actual ~ fullGroup1B$predicted), lwd=2.5, col=2)
+plot(jitter(fullGroup2B$predicted, 1.5), jitter(fullGroup2B$actual, 1.5), main=paste("2nd Base (nobs = ", nrow(fullGroup2B), ")"), xlab="Predicted prob. of production", ylab="Actual Fanduel", xlim=c(0.15, 0.85), ylim=c(-5.0, 20.0))
+abline(lm(fullGroup2B$actual ~ fullGroup2B$predicted), lwd=2.5, col=2)
+plot(jitter(fullGroupSS$predicted, 1.5), jitter(fullGroupSS$actual, 1.5), main=paste("Short Stop (nobs = ", nrow(fullGroupSS), ")"), xlab="Predicted prob. of production", ylab="Actual Fanduel", xlim=c(0.15, 0.85), ylim=c(-5.0, 20.0))
+abline(lm(fullGroupSS$actual ~ fullGroupSS$predicted), lwd=2.5, col=2)
+plot(jitter(fullGroup3B$predicted, 1.5), jitter(fullGroup3B$actual, 1.5), main=paste("3rd Base (nobs = ", nrow(fullGroup3B), ")"), xlab="Predicted prob. of production", ylab="Actual Fanduel", xlim=c(0.15, 0.85), ylim=c(-5.0, 20.0))
+abline(lm(fullGroup3B$actual ~ fullGroup3B$predicted), lwd=2.5, col=2)
+plot(jitter(fullGroupC$predicted, 1.5), jitter(fullGroupC$actual, 1.5), main=paste("Catcher (nobs = ", nrow(fullGroupC), ")"), xlab="Predicted prob. of production", ylab="Actual Fanduel", xlim=c(0.15, 0.85), ylim=c(-5.0, 20.0))
+abline(lm(fullGroupC$actual ~ fullGroupC$predicted), lwd=2.5, col=2)
+plot(jitter(fullGroupOF$predicted, 1.5), jitter(fullGroupOF$actual, 1.5), main=paste("Outfield (nobs = ", nrow(fullGroupOF), ")"), xlab="Predicted prob. of production", ylab="Actual Fanduel", xlim=c(0.15, 0.85), ylim=c(-5.0, 20.0))
+abline(lm(fullGroupOF$actual ~ fullGroupOF$predicted), lwd=2.5, col=2)
+par(mfrow = c(1, 1))
+
+####
+#  Random Forest
+####
+library(miscTools); library(ggplot2); library(randomForest)
 #
 # Train random forest
-rf <- randomForest(as.factor(production) ~ fanduelBase + productionRate + oddsAdj + matchupAdj + pitcherAdj + parkAdj + overUnder, data=seriesTrain, ntree=40, na.action=na.omit);
+rf <- randomForest(as.factor(production) ~ fanduelBase + productionRate + oddsAdj + matchupAdj + pitcherAdj + overUnder, data=seriesTrain, ntree=40, na.action=na.omit);
+summary(rf)
 
 # Test random forest
-predictions <- predict(rf, newdata=seriesTest, type="response");
-plot(jitter(as.numeric(predictions) - 1, 0.2), jitter(seriesTest$production, 0.2));
-#updatePrediction(predictions, seriesTest);
+seriesTest$rfPredictions <- predict(rf, newdata=seriesTest, type="response");
+summary(seriesTest$rfPredictions)
+# Results by halves
+plot(density(seriesTest[seriesTest$rfPredictions == 0,]$actual, na.rm=TRUE), col=2, lwd=2.5,
+     main="Random Forest (2014)", xlim=c(-3,15));
+lines(density(seriesTest[seriesTest$rfPredictions == 1,]$actual, na.rm=TRUE), col=3, lwd=2.5);
+legend(10, 0.20, c("Quartile 1", "Quartile 2 & 3", "Quartile 4"),
+       lty=c(1,1), lwd=c(2.5,2.5),col=c("red", "green")) 
 
-available <- !is.na(seriesTest$production - as.numeric(predictions));
-(r2 <- rSquared(seriesTest$production[available], (seriesTest$production - as.double(predictions))[available]));
-(mse <- mean((seriesTest$production - as.double(predictions))[available])^2);
-
-# Plot Predicted vs Actual of random forest model
-p <- ggplot(aes(x=actual, y=pred),
-            data=data.frame(actual=seriesTest$production, pred=as.numeric(predictions) - 1.0))
-p + geom_point() +
-  geom_abline(color="red") +
-  ggtitle(paste("RandomForest Regression in R r^2=", r2, sep=""));
 

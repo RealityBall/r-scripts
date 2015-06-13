@@ -28,7 +28,7 @@ fsTrend <- function(index, data, stream) {
 }
 
 lookback <- 25
-lookahead <- 5
+lookahead <- 10
 m1.dlm <- dlm(FF = 1, V = 0.1, GG = 1, W = 0.01, m0 = 0, C0 = 100) # Started with V=0.8, W=0.1
 
 cl <- makeCluster(1)
